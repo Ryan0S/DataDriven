@@ -14,25 +14,23 @@ CONFIG = {
     "objects": [
         {"object_id": "1", "specimen_id": "2", "fill_density": "70%", "fill_pattern": "grid"},
         {"object_id": "2", "specimen_id": "4", "fill_density": "50%", "fill_pattern": "honeycomb"},
-        # Add more objects here as needed, e.g., {"object_id": "3", "specimen_id": "6", "fill_density": "80%", "fill_pattern": "stars"}
+        # Add more objects as needed, e.g., {"object_id": "3", "specimen_id": "7", "fill_density": "80%", "fill_pattern": "stars"}
     ]
 }
 
-# Source file mapping based on specimen_id
-SOURCE_FILE_MAP = {
-    "1": r"C:\Users\Ryan\Downloads\DogboneExports\001.3mf",
-    "2": r"C:\Users\Ryan\Downloads\DogboneExports\002.3mf",
-    "3": r"C:\Users\Ryan\Downloads\DogboneExports\003.3mf",
-    "4": r"C:\Users\Ryan\Downloads\DogboneExports\004.3mf",
-    "5": r"C:\Users\Ryan\Downloads\DogboneExports\005.3mf",
-    "6": r"C:\Users\Ryan\Downloads\DogboneExports\006.3mf",
-    "7": r"C:\Users\Ryan\Downloads\DogboneExports\007.3mf",
-    # Add more mappings as needed, e.g., "6": r"C:\Users\Ryan\Downloads\DogboneExports\Dogbone_6.3mf"
-}
+# Dynamic source file path generator
+SOURCE_FILE_BASE_DIR = r"C:\Users\Ryan\Downloads\DogboneExports"
+def get_source_file_path(specimen_id: str) -> str:
+    """Generate source file path dynamically based on specimen_id."""
+    # Pad specimen_id to 3 digits (e.g., "1" -> "001", "10" -> "010", "100" -> "100")
+    padded_id = specimen_id.zfill(3)
+    return os.path.join(SOURCE_FILE_BASE_DIR, f"{padded_id}.3mf")
 
 # === UTILITY FUNCTIONS ===
 def extract_3mf(archive_path: str, extract_to: str) -> str:
     """Extract a .3mf file to a specified directory."""
+    if not os.path.exists(archive_path):
+        raise FileNotFoundError(f"❌ Source file not found: {archive_path}")
     with zipfile.ZipFile(archive_path, 'r') as z:
         z.extractall(extract_to)
     print(f"Extracted {archive_path} to {extract_to}")
@@ -172,11 +170,10 @@ def main() -> None:
         try:
             for obj_config in CONFIG["objects"]:
                 specimen_id = obj_config["specimen_id"]
-                if specimen_id not in SOURCE_FILE_MAP:
-                    raise ValueError(f"❌ No source file mapping for specimen_id={specimen_id}")
                 if specimen_id not in temp_dirs:
+                    source_file = get_source_file_path(specimen_id)
                     temp_dirs[specimen_id] = tempfile.TemporaryDirectory()
-                    source_paths[specimen_id] = extract_3mf(SOURCE_FILE_MAP[specimen_id], temp_dirs[specimen_id].name)
+                    source_paths[specimen_id] = extract_3mf(source_file, temp_dirs[specimen_id].name)
 
             processor = ModelProcessor(template_folder, CONFIG["output_3mf_folder"])
             modified_folder = processor.process(CONFIG["objects"], source_paths)
