@@ -9,14 +9,18 @@ from typing import List, Dict, Optional
 # === CONFIG ===
 CONFIG = {
     "template_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf",
-    "output_3mf_folder": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
-    "output_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf",
+    "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
+    "output_3mf_file_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
+    "max_objects_per_file": 6,  # Maximum number of objects per output file
     "objects": [
-        {"specimen_id": "2", "fill_density": "70%", "fill_pattern": "grid"},
-        {"specimen_id": "4", "fill_density": "50%", "fill_pattern": "honeycomb"},
-        {"specimen_id": "6", "fill_density": "60%", "fill_pattern": "honeycomb"},
-        {"specimen_id": "3", "fill_density": "30%", "fill_pattern": "honeycomb"},
-        # Add more objects as needed, e.g., {"specimen_id": "7", "fill_density": "80%", "fill_pattern": "stars"}
+        {"specimen_id": "1", "fill_density": "70%", "fill_pattern": "grid"},
+        {"specimen_id": "2", "fill_density": "50%", "fill_pattern": "honeycomb"},
+        {"specimen_id": "3", "fill_density": "60%", "fill_pattern": "stars"},
+        {"specimen_id": "4", "fill_density": "80%", "fill_pattern": "rectilinear"},
+        {"specimen_id": "5", "fill_density": "40%", "fill_pattern": "triangles"},
+        {"specimen_id": "6", "fill_density": "90%", "fill_pattern": "cubic"},
+        {"specimen_id": "7", "fill_density": "75%", "fill_pattern": "grid"},  # 7 objects total in this example
+        # Add more objects as needed
     ]
 }
 
@@ -132,13 +136,12 @@ class ModelProcessor:
             ET.SubElement(obj, "metadata", {"type": "object", "key": key, "value": value})
 
     def process(self, objects: List[Dict[str, str]], source_paths: Dict[str, str]) -> str:
-        """Process the 3MF model for multiple objects and return the output folder."""
+        """Process the 3MF model for a group of objects and return the output folder."""
         self.setup_output_folder()
         
         target_text = read_file(self.template_path)
         
-        # Replace mesh for each object using its specific source file and dynamic的状态
-
+        # Replace mesh for each object using its specific source file and dynamic object_id
         new_text = target_text
         for index, obj_config in enumerate(objects, start=1):  # Start IDs from 1
             object_id = str(index)
@@ -149,7 +152,7 @@ class ModelProcessor:
         
         write_file(self.output_model_path, new_text)
         
-        # Update config for all objects
+        # Update config for all objects in this group
         self.update_config(objects, source_paths)
         
         for index, obj_config in enumerate(objects, start=1):
@@ -179,11 +182,24 @@ def main() -> None:
                     temp_dirs[specimen_id] = tempfile.TemporaryDirectory()
                     source_paths[specimen_id] = extract_3mf(source_file, temp_dirs[specimen_id].name)
 
-            processor = ModelProcessor(template_folder, CONFIG["output_3mf_folder"])
-            modified_folder = processor.process(CONFIG["objects"], source_paths)
-            
-            rezip_3mf(modified_folder, CONFIG["output_3mf_file"])
-        
+            # Process objects in groups of max_objects_per_file
+            max_objects = CONFIG["max_objects_per_file"]
+            total_objects = len(CONFIG["objects"])
+            num_files = (total_objects + max_objects - 1) // max_objects  # Ceiling division
+
+            for file_idx in range(num_files):
+                start_idx = file_idx * max_objects
+                end_idx = min(start_idx + max_objects, total_objects)
+                group_objects = CONFIG["objects"][start_idx:end_idx]
+
+                # Generate unique output folder and file names
+                output_folder = f"{CONFIG['output_3mf_folder_base']}_{file_idx + 1}"
+                output_file = f"{CONFIG['output_3mf_file_base']}_{file_idx + 1}.3mf"
+
+                processor = ModelProcessor(template_folder, output_folder)
+                processor.process(group_objects, source_paths)
+                rezip_3mf(output_folder, output_file)
+
         finally:
             # Clean up temporary directories
             for temp_dir in temp_dirs.values():
