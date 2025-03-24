@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 import tempfile
 import json
+import subprocess
 from typing import List, Dict, Optional
 
 # === CONFIG ===
@@ -12,8 +13,10 @@ CONFIG = {
     "template_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf",
     "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "output_3mf_file_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
+    "output_gcode_base": r"C:\Users\Ryan\Downloads\G_NumberedBones_7_Modified",  # Base name for G-code files
     "max_objects_per_file": 6,  # Maximum number of objects per output file
-    "objects_json_file": r"C:\Users\Ryan\Desktop\Tidy\DataDriven\objects.json"  # Path to the JSON file containing objects
+    "objects_json_file": r"C:\Users\Ryan\Desktop\Tidy\DataDriven\objects.json",
+    "prusa_slicer_cli": r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"  # Path to PrusaSlicer CLI
 }
 
 # Dynamic source file path generator
@@ -58,7 +61,6 @@ def load_objects_from_json(json_file: str) -> List[Dict[str, str]]:
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             objects = json.load(f)
-        # Validate the structure
         for obj in objects:
             if not all(key in obj for key in ["specimen_id", "fill_density", "fill_pattern"]):
                 raise ValueError(f"❌ Invalid object in JSON: {obj}. Must include specimen_id, fill_density, and fill_pattern.")
@@ -67,6 +69,27 @@ def load_objects_from_json(json_file: str) -> List[Dict[str, str]]:
         raise FileNotFoundError(f"❌ JSON file not found: {json_file}")
     except json.JSONDecodeError:
         raise ValueError(f"❌ Invalid JSON format in file: {json_file}")
+
+def export_gcode(cli: str, input_file: str, output_file: str) -> None:
+    """Slice a .3mf file and export it as G-code using PrusaSlicer CLI."""
+    cmd = [
+        cli,
+        "--printer-technology", "FFF",
+        "--slice",
+        "--export-gcode",
+        "-o", output_file,
+        input_file
+    ]
+
+    print(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print("❌ Error during slicing:")
+        print("STDOUT:\n", result.stdout)
+        print("STDERR:\n", result.stderr)
+    else:
+        print(f"✅ G-code exported to: {output_file}")
 
 # === 3MF PROCESSING ===
 class ModelProcessor:
@@ -204,11 +227,16 @@ def main() -> None:
 
                 # Generate unique output folder and file names
                 output_folder = f"{CONFIG['output_3mf_folder_base']}_{file_idx + 1}"
-                output_file = f"{CONFIG['output_3mf_file_base']}_{file_idx + 1}.3mf"
+                output_3mf_file = f"{CONFIG['output_3mf_file_base']}_{file_idx + 1}.3mf"
+                output_gcode_file = f"{CONFIG['output_gcode_base']}_{file_idx + 1}.gcode"
 
+                # Process and generate .3mf file
                 processor = ModelProcessor(template_folder, output_folder)
                 processor.process(group_objects, source_paths)
-                rezip_3mf(output_folder, output_file)
+                rezip_3mf(output_folder, output_3mf_file)
+
+                # Slice .3mf file to G-code
+                export_gcode(CONFIG["prusa_slicer_cli"], output_3mf_file, output_gcode_file)
 
         finally:
             # Clean up temporary directories
