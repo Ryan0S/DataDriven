@@ -3,10 +3,11 @@ import shutil
 import os
 import xml.etree.ElementTree as ET
 import zipfile
+import tempfile
 
 # === CONFIG ===
-source_3mf_folder = r"C:\Users\Ryan\Downloads\Dogbone_7_unzipped"
-template_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBonesPre_unzipped"
+source_3mf_file = r"C:\Users\Ryan\Downloads\Dogbone_7.3mf"
+template_3mf_file = r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf"
 output_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified"
 output_3mf_file = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf"
 object_id_to_replace = "1"
@@ -14,6 +15,13 @@ new_fill_density = "70%"    # New fill density value
 new_fill_pattern = "grid"   # New fill pattern value
 
 # === FUNCTIONS ===
+def extract_3mf(archive_path, extract_to):
+    """Extract a .3mf file to a specified directory."""
+    with zipfile.ZipFile(archive_path, 'r') as z:
+        z.extractall(extract_to)
+    print(f"Extracted {archive_path} to {extract_to}")
+    return extract_to
+
 def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, object_id, fill_density, fill_pattern):
     source_model_path = os.path.join(source_folder, "3D", "3dmodel.model")
     template_model_path = os.path.join(template_folder, "3D", "3dmodel.model")
@@ -69,7 +77,6 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
         if fill_density_elem is not None:
             fill_density_elem.set("value", fill_density)
         else:
-            # If it doesn't exist, create it
             ET.SubElement(obj, "metadata", {"type": "object", "key": "fill_density", "value": fill_density})
 
         # Update fill_pattern
@@ -77,7 +84,6 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
         if fill_pattern_elem is not None:
             fill_pattern_elem.set("value", fill_pattern)
         else:
-            # If it doesn't exist, create it
             ET.SubElement(obj, "metadata", {"type": "object", "key": "fill_pattern", "value": fill_pattern})
 
         # Update volume's lastid
@@ -99,11 +105,7 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
     return output_folder
 
 def rezip_3mf(folder_path, output_path):
-    """
-    Repack the contents of a folder into a valid .3mf (zip) file.
-    - folder_path: path to folder containing 3D/, Metadata/, etc.
-    - output_path: desired output .3mf path
-    """
+    """Repack the contents of a folder into a valid .3mf (zip) file."""
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as z:
         for root, _, files in os.walk(folder_path):
             for file in files:
@@ -114,18 +116,26 @@ def rezip_3mf(folder_path, output_path):
 
 # === RUN ===
 def main():
-    # Step 1: Modify the 3MF folder contents
-    modified_folder = replace_mesh_in_3mf_folder(
-        source_3mf_folder,
-        template_3mf_folder,
-        output_3mf_folder,
-        object_id_to_replace,
-        new_fill_density,
-        new_fill_pattern
-    )
+    # Create temporary directories for extraction
+    with tempfile.TemporaryDirectory() as temp_source_dir, tempfile.TemporaryDirectory() as temp_template_dir:
+        # Step 1: Extract source and template .3mf files
+        source_folder = extract_3mf(source_3mf_file, temp_source_dir)
+        template_folder = extract_3mf(template_3mf_file, temp_template_dir)
+
+        # Step 2: Modify the 3MF folder contents
+        modified_folder = replace_mesh_in_3mf_folder(
+            source_folder,
+            template_folder,
+            output_3mf_folder,
+            object_id_to_replace,
+            new_fill_density,
+            new_fill_pattern
+        )
     
-    # Step 2: Repack the modified folder into a .3mf file
-    rezip_3mf(modified_folder, output_3mf_file)
+        # Step 3: Repack the modified folder into a .3mf file
+        rezip_3mf(modified_folder, output_3mf_file)
+
+    # Temporary directories are automatically cleaned up when exiting the 'with' block
 
 if __name__ == "__main__":
     main()
