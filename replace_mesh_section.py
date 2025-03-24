@@ -4,6 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 import zipfile
 import tempfile
+import json
 from typing import List, Dict, Optional
 
 # === CONFIG ===
@@ -12,16 +13,7 @@ CONFIG = {
     "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "output_3mf_file_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "max_objects_per_file": 6,  # Maximum number of objects per output file
-    "objects": [
-        {"specimen_id": "1", "fill_density": "70%", "fill_pattern": "grid"},
-        {"specimen_id": "2", "fill_density": "50%", "fill_pattern": "honeycomb"},
-        {"specimen_id": "3", "fill_density": "60%", "fill_pattern": "stars"},
-        {"specimen_id": "4", "fill_density": "80%", "fill_pattern": "rectilinear"},
-        {"specimen_id": "5", "fill_density": "40%", "fill_pattern": "triangles"},
-        {"specimen_id": "6", "fill_density": "90%", "fill_pattern": "cubic"},
-        {"specimen_id": "7", "fill_density": "75%", "fill_pattern": "grid"},  # 7 objects total in this example
-        # Add more objects as needed
-    ]
+    "objects_json_file": r"C:\Users\Ryan\Desktop\Tidy\DataDriven\objects.json"  # Path to the JSON file containing objects
 }
 
 # Dynamic source file path generator
@@ -60,6 +52,21 @@ def write_file(file_path: str, content: str) -> None:
     """Write content to a file with UTF-8 encoding."""
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
+
+def load_objects_from_json(json_file: str) -> List[Dict[str, str]]:
+    """Load the objects list from a JSON file."""
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            objects = json.load(f)
+        # Validate the structure
+        for obj in objects:
+            if not all(key in obj for key in ["specimen_id", "fill_density", "fill_pattern"]):
+                raise ValueError(f"❌ Invalid object in JSON: {obj}. Must include specimen_id, fill_density, and fill_pattern.")
+        return objects
+    except FileNotFoundError:
+        raise FileNotFoundError(f"❌ JSON file not found: {json_file}")
+    except json.JSONDecodeError:
+        raise ValueError(f"❌ Invalid JSON format in file: {json_file}")
 
 # === 3MF PROCESSING ===
 class ModelProcessor:
@@ -167,6 +174,9 @@ class ModelProcessor:
 
 # === MAIN ===
 def main() -> None:
+    # Load objects from JSON file
+    objects = load_objects_from_json(CONFIG["objects_json_file"])
+    
     # Extract all source files based on specimen_ids
     source_paths = {}
     with tempfile.TemporaryDirectory() as temp_template_dir:
@@ -175,7 +185,7 @@ def main() -> None:
         # Create temporary directories for each unique specimen_id
         temp_dirs = {}
         try:
-            for obj_config in CONFIG["objects"]:
+            for obj_config in objects:
                 specimen_id = obj_config["specimen_id"]
                 if specimen_id not in temp_dirs:
                     source_file = get_source_file_path(specimen_id)
@@ -184,13 +194,13 @@ def main() -> None:
 
             # Process objects in groups of max_objects_per_file
             max_objects = CONFIG["max_objects_per_file"]
-            total_objects = len(CONFIG["objects"])
+            total_objects = len(objects)
             num_files = (total_objects + max_objects - 1) // max_objects  # Ceiling division
 
             for file_idx in range(num_files):
                 start_idx = file_idx * max_objects
                 end_idx = min(start_idx + max_objects, total_objects)
-                group_objects = CONFIG["objects"][start_idx:end_idx]
+                group_objects = objects[start_idx:end_idx]
 
                 # Generate unique output folder and file names
                 output_folder = f"{CONFIG['output_3mf_folder_base']}_{file_idx + 1}"

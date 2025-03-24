@@ -1,0 +1,9 @@
+[
+    {"specimen_id": "1", "fill_density": "70%", "fill_pattern": "grid"},
+    {"specimen_id": "2", "fill_density": "50%", "fill_pattern": "honeycomb"},
+    {"specimen_id": "3", "fill_density": "60%", "fill_pattern": "stars"},
+    {"specimen_id": "4", "fill_density": "80%", "fill_pattern": "rectilinear"},
+    {"specimen_id": "5", "fill_density": "40%", "fill_pattern": "triangles"},
+    {"specimen_id": "6", "fill_density": "90%", "fill_pattern": "cubic"},
+    {"specimen_id": "7", "fill_density": "75%", "fill_pattern": "grid"}
+]
