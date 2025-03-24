@@ -10,9 +10,11 @@ template_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBonesPre_unzipped"
 output_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified"
 output_3mf_file = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf"
 object_id_to_replace = "1"
+new_fill_density = "70%"    # New fill density value
+new_fill_pattern = "grid"   # New fill pattern value
 
 # === FUNCTIONS ===
-def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, object_id):
+def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, object_id, fill_density, fill_pattern):
     source_model_path = os.path.join(source_folder, "3D", "3dmodel.model")
     template_model_path = os.path.join(template_folder, "3D", "3dmodel.model")
     
@@ -56,25 +58,45 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
     with open(output_model_path, 'w', encoding='utf-8') as f:
         f.write(new_text)
 
-    # Update the config file with triangle count
+    # Update the config file
     tree = ET.parse(output_config_path)
     root = tree.getroot()
     
-    # Find the object with matching id and update its volume's lastid
+    # Find the object with matching id and update its properties
     for obj in root.findall(f".//object[@id='{object_id}']"):
+        # Update fill_density
+        fill_density_elem = obj.find(".//metadata[@key='fill_density']")
+        if fill_density_elem is not None:
+            fill_density_elem.set("value", fill_density)
+        else:
+            # If it doesn't exist, create it
+            ET.SubElement(obj, "metadata", {"type": "object", "key": "fill_density", "value": fill_density})
+
+        # Update fill_pattern
+        fill_pattern_elem = obj.find(".//metadata[@key='fill_pattern']")
+        if fill_pattern_elem is not None:
+            fill_pattern_elem.set("value", fill_pattern)
+        else:
+            # If it doesn't exist, create it
+            ET.SubElement(obj, "metadata", {"type": "object", "key": "fill_pattern", "value": fill_pattern})
+
+        # Update volume's lastid
         volume = obj.find("volume")
         if volume is not None:
             volume.set("lastid", str(triangle_count))
-            break
+        else:
+            raise ValueError(f"❌ Could not find volume for object id={object_id} in config file.")
+        break
     else:
         raise ValueError(f"❌ Could not find object id={object_id} in config file.")
 
     # Write updated config file
     tree.write(output_config_path, encoding="utf-8", xml_declaration=True)
 
-    print(f"✅ Mesh replaced and config updated for object id={object_id} in duplicated 3MF folder at:\n{output_model_path}")
+    print(f"✅ Mesh replaced, config updated (fill_density={fill_density}, fill_pattern={fill_pattern}, lastid={triangle_count}) "
+          f"for object id={object_id} in:\n{output_model_path}")
     
-    return output_folder  # Return the modified folder path for zipping
+    return output_folder
 
 def rezip_3mf(folder_path, output_path):
     """
@@ -97,7 +119,9 @@ def main():
         source_3mf_folder,
         template_3mf_folder,
         output_3mf_folder,
-        object_id_to_replace
+        object_id_to_replace,
+        new_fill_density,
+        new_fill_pattern
     )
     
     # Step 2: Repack the modified folder into a .3mf file
