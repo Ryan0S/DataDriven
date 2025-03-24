@@ -1,6 +1,7 @@
 import re
 import shutil
 import os
+import xml.etree.ElementTree as ET
 
 # === CONFIG ===
 source_3mf_folder = r"C:\Users\Ryan\Downloads\Dogbone_7_unzipped"
@@ -12,18 +13,22 @@ object_id_to_replace = "1"
 def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, object_id):
     source_model_path = os.path.join(source_folder, "3D", "3dmodel.model")
     template_model_path = os.path.join(template_folder, "3D", "3dmodel.model")
-
+    
     # Duplicate template folder into output
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
     shutil.copytree(template_folder, output_folder)
     output_model_path = os.path.join(output_folder, "3D", "3dmodel.model")
+    output_config_path = os.path.join(output_folder, "Metadata", "Slic3r_PE_model.config")
 
-    # Read files
+    # Read 3dmodel.model files
     with open(source_model_path, 'r', encoding='utf-8') as f:
         source_text = f.read()
     with open(template_model_path, 'r', encoding='utf-8') as f:
         target_text = f.read()
+
+    # Count number of <triangle ... /> entries in the source
+    triangle_count = len(re.findall(r"<triangle\b", source_text)) - 1
 
     # Extract <mesh>...</mesh> from source
     mesh_match = re.search(r"<mesh>.*?</mesh>", source_text, re.DOTALL)
@@ -49,7 +54,23 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
     with open(output_model_path, 'w', encoding='utf-8') as f:
         f.write(new_text)
 
-    print(f"✅ Mesh replaced for object id={object_id} in duplicated 3MF folder at:\n{output_model_path}")
+    # Update the config file with triangle count
+    tree = ET.parse(output_config_path)
+    root = tree.getroot()
+    
+    # Find the object with matching id and update its volume's lastid
+    for obj in root.findall(f".//object[@id='{object_id}']"):
+        volume = obj.find("volume")
+        if volume is not None:
+            volume.set("lastid", str(triangle_count))
+            break
+    else:
+        raise ValueError(f"❌ Could not find object id={object_id} in config file.")
+
+    # Write updated config file
+    tree.write(output_config_path, encoding="utf-8", xml_declaration=True)
+
+    print(f"✅ Mesh replaced and config updated for object id={object_id} in duplicated 3MF folder at:\n{output_model_path}")
 
 # === RUN ===
 replace_mesh_in_3mf_folder(source_3mf_folder, template_3mf_folder, output_3mf_folder, object_id_to_replace)
