@@ -4,7 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 import zipfile
 import tempfile
-from typing import Optional
+from typing import List, Dict, Optional
 
 # === CONFIG ===
 CONFIG = {
@@ -12,9 +12,11 @@ CONFIG = {
     "template_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf",
     "output_3mf_folder": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "output_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf",
-    "object_id": "1",
-    "fill_density": "70%",
-    "fill_pattern": "grid",
+    "objects": [
+        {"id": "1", "fill_density": "70%", "fill_pattern": "grid"},
+        {"id": "2", "fill_density": "23%", "fill_pattern": "honeycomb"},
+        # Add more objects here as needed, e.g., {"id": "3", "fill_density": "80%", "fill_pattern": "stars"}
+    ]
 }
 
 # === UTILITY FUNCTIONS ===
@@ -47,14 +49,13 @@ def write_file(file_path: str, content: str) -> None:
 
 # === 3MF PROCESSING ===
 class ModelProcessor:
-    def __init__(self, source_folder: str, template_folder: str, output_folder: str, object_id: str):
+    def __init__(self, source_folder: str, template_folder: str, output_folder: str):
         self.source_path = os.path.join(source_folder, "3D", "3dmodel.model")
-        self.template_path = os.path.join(template_folder, "3D", "3dmodel.model")  # Added template_path
+        self.template_path = os.path.join(template_folder, "3D", "3dmodel.model")
         self.template_folder = template_folder
         self.output_folder = output_folder
         self.output_model_path = os.path.join(output_folder, "3D", "3dmodel.model")
         self.output_config_path = os.path.join(output_folder, "Metadata", "Slic3r_PE_model.config")
-        self.object_id = object_id
 
     def setup_output_folder(self) -> None:
         """Duplicate the entire template folder to output, replacing existing if necessary."""
@@ -73,34 +74,41 @@ class ModelProcessor:
         """Count triangles in model text."""
         return len(re.findall(r"<triangle\b", text)) - 1
 
-    def replace_mesh(self, source_text: str, target_text: str) -> str:
-        """Replace mesh in target text with source mesh."""
-        pattern = fr'(<object id="{self.object_id}" type="model">.*?)(<mesh>.*?</mesh>)(.*?</object>)'
+    def replace_mesh(self, source_text: str, target_text: str, object_id: str) -> str:
+        """Replace mesh in target text for a specific object ID."""
+        pattern = fr'(<object id="{object_id}" type="model">.*?)(<mesh>.*?</mesh>)(.*?</object>)'
         match = re.search(pattern, target_text, re.DOTALL)
         if not match:
-            raise ValueError(f"❌ Could not find object id={self.object_id} with a <mesh> in target file.")
+            raise ValueError(f"❌ Could not find object id={object_id} with a <mesh> in target file.")
         
         before, _, after = match.groups()
         new_mesh = self.extract_mesh(source_text)
         replaced_object = before + new_mesh + after
         return target_text.replace(match.group(0), replaced_object)
 
-    def update_config(self, triangle_count: int, fill_density: str, fill_pattern: str) -> None:
-        """Update config file with new triangle count, fill density, and pattern."""
+    def update_config(self, objects: List[Dict[str, str]]) -> None:
+        """Update config file for multiple objects with triangle count, fill density, and pattern."""
         tree = ET.parse(self.output_config_path)
         root = tree.getroot()
-        
-        obj = root.find(f".//object[@id='{self.object_id}']")
-        if obj is None:
-            raise ValueError(f"❌ Could not find object id={self.object_id} in config file.")
+        source_text = read_file(self.source_path)
+        triangle_count = self.count_triangles(source_text)
 
-        self._update_metadata(obj, "fill_density", fill_density)
-        self._update_metadata(obj, "fill_pattern", fill_pattern)
-        
-        volume = obj.find("volume")
-        if volume is None:
-            raise ValueError(f"❌ Could not find volume for object id={self.object_id} in config file.")
-        volume.set("lastid", str(triangle_count))
+        for obj_config in objects:
+            object_id = obj_config["id"]
+            fill_density = obj_config["fill_density"]
+            fill_pattern = obj_config["fill_pattern"]
+
+            obj = root.find(f".//object[@id='{object_id}']")
+            if obj is None:
+                raise ValueError(f"❌ Could not find object id={object_id} in config file.")
+
+            self._update_metadata(obj, "fill_density", fill_density)
+            self._update_metadata(obj, "fill_pattern", fill_pattern)
+            
+            volume = obj.find("volume")
+            if volume is None:
+                raise ValueError(f"❌ Could not find volume for object id={object_id} in config file.")
+            volume.set("lastid", str(triangle_count))
 
         tree.write(self.output_config_path, encoding="utf-8", xml_declaration=True)
 
@@ -112,21 +120,28 @@ class ModelProcessor:
         else:
             ET.SubElement(obj, "metadata", {"type": "object", "key": key, "value": value})
 
-    def process(self, fill_density: str, fill_pattern: str) -> str:
-        """Process the 3MF model and return the output folder."""
+    def process(self, objects: List[Dict[str, str]]) -> str:
+        """Process the 3MF model for multiple objects and return the output folder."""
         self.setup_output_folder()
         
         source_text = read_file(self.source_path)
-        target_text = read_file(self.template_path)  # Fixed: Read from template_path, not source_path
+        target_text = read_file(self.template_path)
         
-        new_text = self.replace_mesh(source_text, target_text)
+        # Replace mesh for each object
+        new_text = target_text
+        for obj_config in objects:
+            new_text = self.replace_mesh(source_text, new_text, obj_config["id"])
+        
         write_file(self.output_model_path, new_text)
         
-        triangle_count = self.count_triangles(source_text)
-        self.update_config(triangle_count, fill_density, fill_pattern)
+        # Update config for all objects
+        self.update_config(objects)
         
-        print(f"✅ Mesh replaced, config updated (fill_density={fill_density}, fill_pattern={fill_pattern}, lastid={triangle_count}) "
-              f"for object id={self.object_id} in:\n{self.output_model_path}")
+        triangle_count = self.count_triangles(source_text)
+        for obj_config in objects:
+            print(f"✅ Mesh replaced, config updated (fill_density={obj_config['fill_density']}, "
+                  f"fill_pattern={obj_config['fill_pattern']}, lastid={triangle_count}) "
+                  f"for object id={obj_config['id']} in:\n{self.output_model_path}")
         return self.output_folder
 
 # === MAIN ===
@@ -135,8 +150,8 @@ def main() -> None:
         source_folder = extract_3mf(CONFIG["source_3mf_file"], temp_source_dir)
         template_folder = extract_3mf(CONFIG["template_3mf_file"], temp_template_dir)
 
-        processor = ModelProcessor(source_folder, template_folder, CONFIG["output_3mf_folder"], CONFIG["object_id"])
-        modified_folder = processor.process(CONFIG["fill_density"], CONFIG["fill_pattern"])
+        processor = ModelProcessor(source_folder, template_folder, CONFIG["output_3mf_folder"])
+        modified_folder = processor.process(CONFIG["objects"])
         
         rezip_3mf(modified_folder, CONFIG["output_3mf_file"])
 
