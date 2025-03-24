@@ -8,15 +8,26 @@ from typing import List, Dict, Optional
 
 # === CONFIG ===
 CONFIG = {
-    "source_3mf_file": r"C:\Users\Ryan\Downloads\Dogbone_7.3mf",
     "template_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf",
     "output_3mf_folder": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "output_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf",
     "objects": [
-        {"id": "1", "fill_density": "70%", "fill_pattern": "grid"},
-        {"id": "2", "fill_density": "23%", "fill_pattern": "honeycomb"},
-        # Add more objects here as needed, e.g., {"id": "3", "fill_density": "80%", "fill_pattern": "stars"}
+        {"object_id": "1", "specimen_id": "2", "fill_density": "70%", "fill_pattern": "grid"},
+        {"object_id": "2", "specimen_id": "4", "fill_density": "50%", "fill_pattern": "honeycomb"},
+        # Add more objects here as needed, e.g., {"object_id": "3", "specimen_id": "6", "fill_density": "80%", "fill_pattern": "stars"}
     ]
+}
+
+# Source file mapping based on specimen_id
+SOURCE_FILE_MAP = {
+    "1": r"C:\Users\Ryan\Downloads\DogboneExports\001.3mf",
+    "2": r"C:\Users\Ryan\Downloads\DogboneExports\002.3mf",
+    "3": r"C:\Users\Ryan\Downloads\DogboneExports\003.3mf",
+    "4": r"C:\Users\Ryan\Downloads\DogboneExports\004.3mf",
+    "5": r"C:\Users\Ryan\Downloads\DogboneExports\005.3mf",
+    "6": r"C:\Users\Ryan\Downloads\DogboneExports\006.3mf",
+    "7": r"C:\Users\Ryan\Downloads\DogboneExports\007.3mf",
+    # Add more mappings as needed, e.g., "6": r"C:\Users\Ryan\Downloads\DogboneExports\Dogbone_6.3mf"
 }
 
 # === UTILITY FUNCTIONS ===
@@ -49,8 +60,7 @@ def write_file(file_path: str, content: str) -> None:
 
 # === 3MF PROCESSING ===
 class ModelProcessor:
-    def __init__(self, source_folder: str, template_folder: str, output_folder: str):
-        self.source_path = os.path.join(source_folder, "3D", "3dmodel.model")
+    def __init__(self, template_folder: str, output_folder: str):
         self.template_path = os.path.join(template_folder, "3D", "3dmodel.model")
         self.template_folder = template_folder
         self.output_folder = output_folder
@@ -86,17 +96,19 @@ class ModelProcessor:
         replaced_object = before + new_mesh + after
         return target_text.replace(match.group(0), replaced_object)
 
-    def update_config(self, objects: List[Dict[str, str]]) -> None:
+    def update_config(self, objects: List[Dict[str, str]], source_paths: Dict[str, str]) -> None:
         """Update config file for multiple objects with triangle count, fill density, and pattern."""
         tree = ET.parse(self.output_config_path)
         root = tree.getroot()
-        source_text = read_file(self.source_path)
-        triangle_count = self.count_triangles(source_text)
 
         for obj_config in objects:
-            object_id = obj_config["id"]
+            object_id = obj_config["object_id"]
             fill_density = obj_config["fill_density"]
             fill_pattern = obj_config["fill_pattern"]
+            specimen_id = obj_config["specimen_id"]
+            source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
+            source_text = read_file(source_path)
+            triangle_count = self.count_triangles(source_text)
 
             obj = root.find(f".//object[@id='{object_id}']")
             if obj is None:
@@ -120,40 +132,61 @@ class ModelProcessor:
         else:
             ET.SubElement(obj, "metadata", {"type": "object", "key": key, "value": value})
 
-    def process(self, objects: List[Dict[str, str]]) -> str:
+    def process(self, objects: List[Dict[str, str]], source_paths: Dict[str, str]) -> str:
         """Process the 3MF model for multiple objects and return the output folder."""
         self.setup_output_folder()
         
-        source_text = read_file(self.source_path)
         target_text = read_file(self.template_path)
         
-        # Replace mesh for each object
+        # Replace mesh for each object using its specific source file
         new_text = target_text
         for obj_config in objects:
-            new_text = self.replace_mesh(source_text, new_text, obj_config["id"])
+            specimen_id = obj_config["specimen_id"]
+            source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
+            source_text = read_file(source_path)
+            new_text = self.replace_mesh(source_text, new_text, obj_config["object_id"])
         
         write_file(self.output_model_path, new_text)
         
         # Update config for all objects
-        self.update_config(objects)
+        self.update_config(objects, source_paths)
         
-        triangle_count = self.count_triangles(source_text)
         for obj_config in objects:
+            specimen_id = obj_config["specimen_id"]
+            source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
+            triangle_count = self.count_triangles(read_file(source_path))
             print(f"✅ Mesh replaced, config updated (fill_density={obj_config['fill_density']}, "
                   f"fill_pattern={obj_config['fill_pattern']}, lastid={triangle_count}) "
-                  f"for object id={obj_config['id']} in:\n{self.output_model_path}")
+                  f"for object id={obj_config['object_id']} from specimen {specimen_id} in:\n{self.output_model_path}")
         return self.output_folder
 
 # === MAIN ===
 def main() -> None:
-    with tempfile.TemporaryDirectory() as temp_source_dir, tempfile.TemporaryDirectory() as temp_template_dir:
-        source_folder = extract_3mf(CONFIG["source_3mf_file"], temp_source_dir)
+    # Extract all source files based on specimen_ids
+    source_paths = {}
+    with tempfile.TemporaryDirectory() as temp_template_dir:
         template_folder = extract_3mf(CONFIG["template_3mf_file"], temp_template_dir)
-
-        processor = ModelProcessor(source_folder, template_folder, CONFIG["output_3mf_folder"])
-        modified_folder = processor.process(CONFIG["objects"])
         
-        rezip_3mf(modified_folder, CONFIG["output_3mf_file"])
+        # Create temporary directories for each unique specimen_id
+        temp_dirs = {}
+        try:
+            for obj_config in CONFIG["objects"]:
+                specimen_id = obj_config["specimen_id"]
+                if specimen_id not in SOURCE_FILE_MAP:
+                    raise ValueError(f"❌ No source file mapping for specimen_id={specimen_id}")
+                if specimen_id not in temp_dirs:
+                    temp_dirs[specimen_id] = tempfile.TemporaryDirectory()
+                    source_paths[specimen_id] = extract_3mf(SOURCE_FILE_MAP[specimen_id], temp_dirs[specimen_id].name)
+
+            processor = ModelProcessor(template_folder, CONFIG["output_3mf_folder"])
+            modified_folder = processor.process(CONFIG["objects"], source_paths)
+            
+            rezip_3mf(modified_folder, CONFIG["output_3mf_file"])
+        
+        finally:
+            # Clean up temporary directories
+            for temp_dir in temp_dirs.values():
+                temp_dir.cleanup()
 
 if __name__ == "__main__":
     main()
