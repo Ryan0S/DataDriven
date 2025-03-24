@@ -12,9 +12,11 @@ CONFIG = {
     "output_3mf_folder": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
     "output_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf",
     "objects": [
-        {"object_id": "1", "specimen_id": "2", "fill_density": "70%", "fill_pattern": "grid"},
-        {"object_id": "2", "specimen_id": "4", "fill_density": "50%", "fill_pattern": "honeycomb"},
-        # Add more objects as needed, e.g., {"object_id": "3", "specimen_id": "7", "fill_density": "80%", "fill_pattern": "stars"}
+        {"specimen_id": "2", "fill_density": "70%", "fill_pattern": "grid"},
+        {"specimen_id": "4", "fill_density": "50%", "fill_pattern": "honeycomb"},
+        {"specimen_id": "6", "fill_density": "60%", "fill_pattern": "honeycomb"},
+        {"specimen_id": "3", "fill_density": "30%", "fill_pattern": "honeycomb"},
+        # Add more objects as needed, e.g., {"specimen_id": "7", "fill_density": "80%", "fill_pattern": "stars"}
     ]
 }
 
@@ -22,7 +24,6 @@ CONFIG = {
 SOURCE_FILE_BASE_DIR = r"C:\Users\Ryan\Downloads\DogboneExports"
 def get_source_file_path(specimen_id: str) -> str:
     """Generate source file path dynamically based on specimen_id."""
-    # Pad specimen_id to 3 digits (e.g., "1" -> "001", "10" -> "010", "100" -> "100")
     padded_id = specimen_id.zfill(3)
     return os.path.join(SOURCE_FILE_BASE_DIR, f"{padded_id}.3mf")
 
@@ -99,8 +100,8 @@ class ModelProcessor:
         tree = ET.parse(self.output_config_path)
         root = tree.getroot()
 
-        for obj_config in objects:
-            object_id = obj_config["object_id"]
+        for index, obj_config in enumerate(objects, start=1):  # Start IDs from 1
+            object_id = str(index)
             fill_density = obj_config["fill_density"]
             fill_pattern = obj_config["fill_pattern"]
             specimen_id = obj_config["specimen_id"]
@@ -136,26 +137,29 @@ class ModelProcessor:
         
         target_text = read_file(self.template_path)
         
-        # Replace mesh for each object using its specific source file
+        # Replace mesh for each object using its specific source file and dynamic的状态
+
         new_text = target_text
-        for obj_config in objects:
+        for index, obj_config in enumerate(objects, start=1):  # Start IDs from 1
+            object_id = str(index)
             specimen_id = obj_config["specimen_id"]
             source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
             source_text = read_file(source_path)
-            new_text = self.replace_mesh(source_text, new_text, obj_config["object_id"])
+            new_text = self.replace_mesh(source_text, new_text, object_id)
         
         write_file(self.output_model_path, new_text)
         
         # Update config for all objects
         self.update_config(objects, source_paths)
         
-        for obj_config in objects:
+        for index, obj_config in enumerate(objects, start=1):
+            object_id = str(index)
             specimen_id = obj_config["specimen_id"]
             source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
             triangle_count = self.count_triangles(read_file(source_path))
             print(f"✅ Mesh replaced, config updated (fill_density={obj_config['fill_density']}, "
                   f"fill_pattern={obj_config['fill_pattern']}, lastid={triangle_count}) "
-                  f"for object id={obj_config['object_id']} from specimen {specimen_id} in:\n{self.output_model_path}")
+                  f"for object id={object_id} from specimen {specimen_id} in:\n{self.output_model_path}")
         return self.output_folder
 
 # === MAIN ===
