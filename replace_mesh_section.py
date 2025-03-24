@@ -2,14 +2,16 @@ import re
 import shutil
 import os
 import xml.etree.ElementTree as ET
+import zipfile
 
 # === CONFIG ===
 source_3mf_folder = r"C:\Users\Ryan\Downloads\Dogbone_7_unzipped"
 template_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBonesPre_unzipped"
 output_3mf_folder = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified"
+output_3mf_file = r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified.3mf"
 object_id_to_replace = "1"
 
-# === FUNCTION ===
+# === FUNCTIONS ===
 def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, object_id):
     source_model_path = os.path.join(source_folder, "3D", "3dmodel.model")
     template_model_path = os.path.join(template_folder, "3D", "3dmodel.model")
@@ -71,6 +73,35 @@ def replace_mesh_in_3mf_folder(source_folder, template_folder, output_folder, ob
     tree.write(output_config_path, encoding="utf-8", xml_declaration=True)
 
     print(f"✅ Mesh replaced and config updated for object id={object_id} in duplicated 3MF folder at:\n{output_model_path}")
+    
+    return output_folder  # Return the modified folder path for zipping
+
+def rezip_3mf(folder_path, output_path):
+    """
+    Repack the contents of a folder into a valid .3mf (zip) file.
+    - folder_path: path to folder containing 3D/, Metadata/, etc.
+    - output_path: desired output .3mf path
+    """
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as z:
+        for root, _, files in os.walk(folder_path):
+            for file in files:
+                abs_path = os.path.join(root, file)
+                rel_path = os.path.relpath(abs_path, folder_path)
+                z.write(abs_path, rel_path)
+    print(f"✅ Repacked into: {output_path}")
 
 # === RUN ===
-replace_mesh_in_3mf_folder(source_3mf_folder, template_3mf_folder, output_3mf_folder, object_id_to_replace)
+def main():
+    # Step 1: Modify the 3MF folder contents
+    modified_folder = replace_mesh_in_3mf_folder(
+        source_3mf_folder,
+        template_3mf_folder,
+        output_3mf_folder,
+        object_id_to_replace
+    )
+    
+    # Step 2: Repack the modified folder into a .3mf file
+    rezip_3mf(modified_folder, output_3mf_file)
+
+if __name__ == "__main__":
+    main()
