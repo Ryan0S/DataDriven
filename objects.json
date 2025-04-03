@@ -1,9 +1,86 @@
 [
-    {"specimen_id": "1", "fill_density": "70%", "fill_pattern": "grid"},
-    {"specimen_id": "2", "fill_density": "50%", "fill_pattern": "honeycomb"},
-    {"specimen_id": "3", "fill_density": "60%", "fill_pattern": "stars"},
-    {"specimen_id": "4", "fill_density": "80%", "fill_pattern": "rectilinear"},
-    {"specimen_id": "5", "fill_density": "40%", "fill_pattern": "triangles"},
-    {"specimen_id": "6", "fill_density": "90%", "fill_pattern": "cubic"},
-    {"specimen_id": "7", "fill_density": "75%", "fill_pattern": "grid"}
+  {
+    "specimen_id": "14",
+    "fill_density": "90%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "2",
+    "solid_infill_every_layers": "5"
+  },
+  {
+    "specimen_id": "15",
+    "fill_density": "40%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "5",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "16",
+    "fill_density": "15%",
+    "fill_pattern": "stars",
+    "perimeters": "6",
+    "solid_infill_every_layers": "10"
+  },
+  {
+    "specimen_id": "17",
+    "fill_density": "45%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "5",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "18",
+    "fill_density": "100%",
+    "fill_pattern": "zigzag",
+    "perimeters": "5",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "19",
+    "fill_density": "100%",
+    "fill_pattern": "zigzag",
+    "perimeters": "8",
+    "solid_infill_every_layers": "5"
+  },
+  {
+    "specimen_id": "20",
+    "fill_density": "90%",
+    "fill_pattern": "zigzag",
+    "perimeters": "5",
+    "solid_infill_every_layers": "5"
+  },
+  {
+    "specimen_id": "21",
+    "fill_density": "45%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "5",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "22",
+    "fill_density": "90%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "2",
+    "solid_infill_every_layers": "5"
+  },
+  {
+    "specimen_id": "23",
+    "fill_density": "50%",
+    "fill_pattern": "grid",
+    "perimeters": "4",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "24",
+    "fill_density": "45%",
+    "fill_pattern": "3dhoneycomb",
+    "perimeters": "5",
+    "solid_infill_every_layers": "15"
+  },
+  {
+    "specimen_id": "25",
+    "fill_density": "90%",
+    "fill_pattern": "rectilinear",
+    "perimeters": "5",
+    "solid_infill_every_layers": "5"
+  }
 ]

@@ -10,11 +10,11 @@ from typing import List, Dict, Optional
 
 # === CONFIG ===
 CONFIG = {
-    "template_3mf_file": r"C:\Users\Ryan\Downloads\NumberedBonesPre.3mf",
-    "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
-    "output_3mf_file_base": r"C:\Users\Ryan\Downloads\NumberedBones_7_Modified",
-    "output_gcode_base": r"C:\Users\Ryan\Downloads\G_NumberedBones_7_Modified",  # Base name for G-code files
-    "max_objects_per_file": 6,  # Maximum number of objects per output file
+    "template_3mf_file": r"C:\Users\Ryan\Downloads\template_12_dogbones.3mf",
+    "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\12_dogbones",
+    "output_3mf_file_base": r"C:\Users\Ryan\Downloads\12_dogbones",
+    "output_gcode_base": r"C:\Users\Ryan\Downloads\12_dogbones",  # Base name for G-code files
+    "max_objects_per_file": 12,  # Maximum number of objects per output file
     "objects_json_file": r"C:\Users\Ryan\Desktop\Tidy\DataDriven\objects.json",
     "prusa_slicer_cli": r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"  # Path to PrusaSlicer CLI
 }
@@ -139,6 +139,10 @@ class ModelProcessor:
             fill_density = obj_config["fill_density"]
             fill_pattern = obj_config["fill_pattern"]
             specimen_id = obj_config["specimen_id"]
+            solid_infill_every_layers = obj_config["solid_infill_every_layers"]
+            perimeters = obj_config["perimeters"]
+
+
             source_path = os.path.join(source_paths[specimen_id], "3D", "3dmodel.model")
             source_text = read_file(source_path)
             triangle_count = self.count_triangles(source_text)
@@ -149,6 +153,8 @@ class ModelProcessor:
 
             self._update_metadata(obj, "fill_density", fill_density)
             self._update_metadata(obj, "fill_pattern", fill_pattern)
+            self._update_metadata(obj, "solid_infill_every_layers", solid_infill_every_layers)
+            self._update_metadata(obj, "perimeters", perimeters)
             
             volume = obj.find("volume")
             if volume is None:
