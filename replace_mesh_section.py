@@ -7,8 +7,21 @@ import tempfile
 import json
 import subprocess
 from typing import List, Dict, Optional
+import pickle
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
-# === CONFIG ===
+
+# === API CONFIGURATION ===
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+CREDENTIALS_FILE = 'credentials.json'  # Your OAuth Client ID JSON
+TOKEN_FILE = 'token_drive.pickle'      # Will be created automatically
+DRIVE_FOLDER_ID = '1rXqywoBKWUcdExU4jpIWjZ4mwbOlmHZF'  # Target folder inside shared drive
+SHARED_DRIVE_ID = '0ADuXLLjfuoALUk9PVA'   # The shared drive ID (starts with '0A...')
+
+# === GCODE and 3MF CONFIG ===
 CONFIG = {
     "template_3mf_file": r"C:\Users\Ryan\Downloads\template_12_dogbones.3mf",
     "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\12_dogbones",
@@ -21,6 +34,40 @@ CONFIG = {
 
 # Dynamic source file path generator
 SOURCE_FILE_BASE_DIR = r"C:\Users\Ryan\Downloads\DogboneExports"
+
+def get_drive_service():
+    """Authenticate and return the Drive service."""
+    creds = None
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_FILE, 'wb') as token:
+            pickle.dump(creds, token)
+    return build('drive', 'v3', credentials=creds)
+
+
+def upload_to_shared_drive(file_path, folder_id, shared_drive_id):
+    """Upload file to a Shared Drive folder."""
+    service = get_drive_service()
+    file_metadata = {
+        'name': os.path.basename(file_path),
+        'parents': [folder_id]
+    }
+    media = MediaFileUpload(file_path, resumable=True)
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id',
+        supportsAllDrives=True
+    ).execute()
+    print(f'✅ Uploaded to Shared Drive: {file_path} (File ID: {file.get("id")})')
+
 def get_source_file_path(specimen_id: str) -> str:
     """Generate source file path dynamically based on specimen_id."""
     padded_id = specimen_id.zfill(3)
@@ -243,6 +290,10 @@ def main() -> None:
 
                 # Slice .3mf file to G-code
                 export_gcode(CONFIG["prusa_slicer_cli"], output_3mf_file, output_gcode_file)
+
+                upload_to_shared_drive(output_3mf_file, DRIVE_FOLDER_ID, SHARED_DRIVE_ID)
+                upload_to_shared_drive(output_gcode_file, DRIVE_FOLDER_ID, SHARED_DRIVE_ID)
+
 
         finally:
             # Clean up temporary directories
