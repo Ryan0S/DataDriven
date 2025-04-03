@@ -7,9 +7,10 @@ from google.auth.transport.requests import Request
 
 # === CONFIGURATION ===
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-CREDENTIALS_FILE = 'credentials.json'  # From Google Cloud Console
+CREDENTIALS_FILE = 'credentials.json'  # Your OAuth Client ID JSON
 TOKEN_FILE = 'token_drive.pickle'      # Will be created automatically
-DRIVE_FOLDER_ID = 'YOUR_DRIVE_FOLDER_ID'  # Replace with your folder ID
+DRIVE_FOLDER_ID = '1rXqywoBKWUcdExU4jpIWjZ4mwbOlmHZF'  # Target folder inside shared drive
+SHARED_DRIVE_ID = '0ADuXLLjfuoALUk9PVA'   # The shared drive ID (starts with '0A...')
 
 
 def get_drive_service():
@@ -29,22 +30,28 @@ def get_drive_service():
     return build('drive', 'v3', credentials=creds)
 
 
-def upload_to_drive(file_path, folder_id):
-    """Upload file to Google Drive folder."""
+def upload_to_shared_drive(file_path, folder_id, shared_drive_id):
+    """Upload file to a Shared Drive folder."""
     service = get_drive_service()
     file_metadata = {
         'name': os.path.basename(file_path),
         'parents': [folder_id]
     }
     media = MediaFileUpload(file_path, resumable=True)
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    print(f'✅ Uploaded to Drive: {file_path} (File ID: {file.get("id")})')
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id',
+        supportsAllDrives=True
+    ).execute()
+    print(f'✅ Uploaded to Shared Drive: {file_path} (File ID: {file.get("id")})')
 
 
 if __name__ == "__main__":
     # === TEST ===
-    test_file = r'C:\Users\Ryan\Downloads\test_file.txt'  # Change to any file you want to test
+    test_file = r'C:\Users\Ryan\Downloads\12_dogbones_1.gcode'  # Change to any file you want to test
     if not os.path.exists(test_file):
         with open(test_file, 'w') as f:
             f.write('This is a test upload file.')
-    upload_to_drive(test_file, DRIVE_FOLDER_ID)
+
+    upload_to_shared_drive(test_file, DRIVE_FOLDER_ID, SHARED_DRIVE_ID)
