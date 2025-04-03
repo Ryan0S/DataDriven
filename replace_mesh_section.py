@@ -12,6 +12,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from datetime import datetime
+
 
 
 # === API CONFIGURATION ===
@@ -20,6 +22,12 @@ CREDENTIALS_FILE = 'credentials.json'  # Your OAuth Client ID JSON
 TOKEN_FILE = 'token_drive.pickle'      # Will be created automatically
 DRIVE_FOLDER_ID = '1rXqywoBKWUcdExU4jpIWjZ4mwbOlmHZF'  # Target folder inside shared drive
 SHARED_DRIVE_ID = '0ADuXLLjfuoALUk9PVA'   # The shared drive ID (starts with '0A...')
+
+SCOPES_SHEETS = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SPREADSHEET_ID = '1Jnc-Lyju3zLz7i5Xaq7G5_8k_c0LYy8FLVQSFWNW1Ds'
+TOKEN_SHEETS_FILE = 'token_sheets.pickle'
+SHEET_NAME = 'objects_json'
+
 
 # === GCODE and 3MF CONFIG ===
 CONFIG = {
@@ -34,6 +42,45 @@ CONFIG = {
 
 # Dynamic source file path generator
 SOURCE_FILE_BASE_DIR = r"C:\Users\Ryan\Downloads\DogboneExports"
+
+def get_sheets_service():
+    """Authenticate and return Sheets service."""
+    creds = None
+    if os.path.exists(TOKEN_SHEETS_FILE):
+        with open(TOKEN_SHEETS_FILE, 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES_SHEETS)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_SHEETS_FILE, 'wb') as token:
+            pickle.dump(creds, token)
+    return build('sheets', 'v4', credentials=creds)
+
+def fetch_objects_json():
+    """Fetch and parse the objects_json content from the sheet."""
+    service = get_sheets_service()
+    range_name = f"{SHEET_NAME}!A1"
+    result = service.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range=range_name
+    ).execute()
+    values = result.get('values', [])
+
+    if not values:
+        raise ValueError("❌ No data found in objects_json sheet.")
+
+    # The JSON is in A1
+    json_text = values[0][0]
+    try:
+        objects = json.loads(json_text)
+        print(f"✅ Fetched {len(objects)} objects from sheet.")
+        return objects
+    except json.JSONDecodeError:
+        raise ValueError("❌ Failed to parse JSON content from sheet.")
+
 
 def get_drive_service():
     """Authenticate and return the Drive service."""
@@ -251,8 +298,8 @@ class ModelProcessor:
 # === MAIN ===
 def main() -> None:
     # Load objects from JSON file
-    objects = load_objects_from_json(CONFIG["objects_json_file"])
-    
+    objects = fetch_objects_json()
+
     # Extract all source files based on specimen_ids
     source_paths = {}
     with tempfile.TemporaryDirectory() as temp_template_dir:
@@ -279,9 +326,19 @@ def main() -> None:
                 group_objects = objects[start_idx:end_idx]
 
                 # Generate unique output folder and file names
+                # Get specimen ID range
+                first_id = group_objects[0]["specimen_id"]
+                last_id = group_objects[-1]["specimen_id"]
+
+                # Get timestamp
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+                # Build filenames
+                base_name = f"specimend-id_{first_id}-{last_id}_time_{timestamp}"
                 output_folder = f"{CONFIG['output_3mf_folder_base']}_{file_idx + 1}"
-                output_3mf_file = f"{CONFIG['output_3mf_file_base']}_{file_idx + 1}.3mf"
-                output_gcode_file = f"{CONFIG['output_gcode_base']}_{file_idx + 1}.gcode"
+                output_3mf_file = f"{CONFIG['output_3mf_file_base']}_{base_name}.3mf"
+                output_gcode_file = f"{CONFIG['output_gcode_base']}_{base_name}.gcode"
+
 
                 # Process and generate .3mf file
                 processor = ModelProcessor(template_folder, output_folder)
