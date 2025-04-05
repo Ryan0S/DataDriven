@@ -31,11 +31,11 @@ SHEET_NAME = 'objects_json'
 
 # === GCODE and 3MF CONFIG ===
 CONFIG = {
-    "template_3mf_file": r"C:\Users\Ryan\Downloads\template_12_dogbones.3mf",
-    "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\12_dogbones",
-    "output_3mf_file_base": r"C:\Users\Ryan\Downloads\12_dogbones",
-    "output_gcode_base": r"C:\Users\Ryan\Downloads\12_dogbones",  # Base name for G-code files
-    "max_objects_per_file": 12,  # Maximum number of objects per output file
+    "template_3mf_file": r"C:\Users\Ryan\Downloads\template_11_dogbones.3mf",
+    "output_3mf_folder_base": r"C:\Users\Ryan\Downloads\11_dogbones",
+    "output_3mf_file_base": r"C:\Users\Ryan\Downloads\11_",
+    "output_gcode_base": r"C:\Users\Ryan\Downloads\11_",  # Base name for G-code files
+    "max_objects_per_file": 11,  # Maximum number of objects per output file
     "objects_json_file": r"C:\Users\Ryan\Desktop\Tidy\DataDriven\objects.json",
     "prusa_slicer_cli": r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"  # Path to PrusaSlicer CLI
 }
@@ -334,10 +334,10 @@ def main() -> None:
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
                 # Build filenames
-                base_name = f"specimend-id_{first_id}-{last_id}_time_{timestamp}"
+                base_name = f"{first_id}-{last_id}_{timestamp}"
                 output_folder = f"{CONFIG['output_3mf_folder_base']}_{file_idx + 1}"
-                output_3mf_file = f"{CONFIG['output_3mf_file_base']}_{base_name}.3mf"
-                output_gcode_file = f"{CONFIG['output_gcode_base']}_{base_name}.gcode"
+                output_3mf_file = f"{CONFIG['output_3mf_file_base']}{base_name}.3mf"
+                output_gcode_file = f"{CONFIG['output_gcode_base']}{base_name}.gcode"
 
 
                 # Process and generate .3mf file
